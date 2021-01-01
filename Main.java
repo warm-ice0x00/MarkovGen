@@ -26,13 +26,14 @@ class GUI {
         String[] words = new String[0];
         try { //把单词数组在启动程序时读进内存，避免反复读取硬盘
             words = Tokenize.tokenize(FileIO.readStrFromFile(new File(FileIO.class.getProtectionDomain().getCodeSource().getLocation().toURI()).getParentFile().getPath() + "/train.txt"));
-        } catch (URISyntaxException e) {
-            JOptionPane.showMessageDialog(null, "train.txt 路径有问题！", "错误", JOptionPane.ERROR_MESSAGE); //train.txt路径有问题时的弹窗
+        } catch (NullPointerException | URISyntaxException e) { //如果找不到train.txt或路径有问题，报错
+            JOptionPane.showMessageDialog(null, "Can't read train.txt!", "Error", JOptionPane.ERROR_MESSAGE);
+            System.exit(-1); //退出程序，代码-1
         }
         Hashtable<String, ArrayList<String>> bigrams = Ngram.get2Grams(words);
         Hashtable<String, Hashtable<String, ArrayList<String>>> trigrams = Ngram.get3Grams(words);
         JFrame jFrame = new JFrame();
-        jFrame.setTitle("MarkovGen");
+        jFrame.setTitle("MarkovGen v1.0.1");
         int[] screenSize = getScreenSize();
         jFrame.setSize((int) Math.round(screenSize[0] * 0.45), (int) Math.round(screenSize[1] * 0.45));
         JButton jButton = new JButton("Generate!");
@@ -67,7 +68,7 @@ class GUI {
             jRadioButton3.setSelected(false); //防止两个单选框同时被选中
             jRadioButton2.setSelected(true); //防止没有单选框被选中
         });
-        jRadioButton3.addActionListener(e -> { //”3-gram“的ActionListener
+        jRadioButton3.addActionListener(e -> { //”3-gram“的ActionListener，同样的套路
             jRadioButton2.setSelected(false);
             jRadioButton3.setSelected(true);
         });
@@ -142,8 +143,8 @@ class MarkovGen {
             output.add(last2Appends[1]);
             if (trigrams.containsKey(last2Appends[0])) {
                 if (trigrams.containsKey(last2Appends[1])) {
-                    ArrayList candidates = trigrams.get(last2Appends[0]).get(last2Appends[1]);
-                    last2Appends = new String[]{last2Appends[1], (String) candidates.get(random.nextInt(candidates.size()))};
+                    ArrayList<String> candidates = trigrams.get(last2Appends[0]).get(last2Appends[1]); //使用泛型
+                    last2Appends = new String[]{last2Appends[1], candidates.get(random.nextInt(candidates.size()))};
                 } else break;
             } else break;
         }
