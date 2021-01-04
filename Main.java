@@ -22,18 +22,21 @@ public class Main {
 }
 
 class GUI {
-    public static void createGUI() {
+    static void createGUI() {
         String[] words = new String[0];
         try { //把单词数组在启动程序时读进内存，避免反复读取硬盘
             words = Tokenize.tokenize(FileIO.readStrFromFile(new File(FileIO.class.getProtectionDomain().getCodeSource().getLocation().toURI()).getParentFile().getPath() + "/train.txt"));
-        } catch (NullPointerException | URISyntaxException e) { //如果找不到train.txt或路径有问题，报错
+        } catch (NullPointerException e) { //如果找不到train.txt或路径有问题，报错
             JOptionPane.showMessageDialog(null, "Can't read train.txt!", "Error", JOptionPane.ERROR_MESSAGE);
+            System.exit(-1); //退出程序，代码-1
+        } catch (URISyntaxException e) {
+            JOptionPane.showMessageDialog(null, "train.txt path error!", "Error", JOptionPane.ERROR_MESSAGE);
             System.exit(-1); //退出程序，代码-1
         }
         Hashtable<String, ArrayList<String>> bigrams = Ngram.get2Grams(words);
         Hashtable<String, Hashtable<String, ArrayList<String>>> trigrams = Ngram.get3Grams(words);
         JFrame jFrame = new JFrame();
-        jFrame.setTitle("MarkovGen v1.0.1");
+        jFrame.setTitle("MarkovGen v1.1");
         int[] screenSize = getScreenSize();
         jFrame.setSize((int) Math.round(screenSize[0] * 0.45), (int) Math.round(screenSize[1] * 0.45));
         JButton jButton = new JButton("Generate!");
@@ -62,7 +65,7 @@ class GUI {
             if (jRadioButton2.isSelected()) //两个单选框都没被选中时（应该不会出现）使用3-gram
                 jTextArea.setText(Tokenize.untokenize(MarkovGen.bigramGen(finalWords, bigrams, 1000)));
             else
-                jTextArea.setText(Tokenize.untokenize(MarkovGen.trigramGen(finalWords, bigrams, trigrams, 1000)));
+                jTextArea.setText(Tokenize.untokenize(MarkovGen.trigramGen(finalWords, bigrams, trigrams)));
         });
         jRadioButton2.addActionListener(e -> { //”2-gram“的ActionListener
             jRadioButton3.setSelected(false); //防止两个单选框同时被选中
@@ -77,14 +80,14 @@ class GUI {
         jFrame.setVisible(true); //一切都准备好后再让窗口可见
     }
 
-    public static int[] getScreenSize() {
+    private static int[] getScreenSize() {
         Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
         return new int[]{screenSize.width, screenSize.height};
     }
 }
 
 class Ngram {
-    public static Hashtable<String, ArrayList<String>> get2Grams(String[] words) {
+    static Hashtable<String, ArrayList<String>> get2Grams(String[] words) {
         Hashtable<String, ArrayList<String>> bigrams = new Hashtable<>();
         for (int i = 0; i < words.length - 1; i++) {
             if (!bigrams.containsKey(words[i])) bigrams.put(words[i], new ArrayList<>());
@@ -93,7 +96,7 @@ class Ngram {
         return bigrams;
     }
 
-    public static Hashtable<String, Hashtable<String, ArrayList<String>>> get3Grams(String[] words) {
+    static Hashtable<String, Hashtable<String, ArrayList<String>>> get3Grams(String[] words) {
         Hashtable<String, Hashtable<String, ArrayList<String>>> trigrams = new Hashtable<>();
         for (int i = 0; i < words.length - 2; i++) {
             if (trigrams.containsKey(words[i])) {
@@ -110,36 +113,37 @@ class Ngram {
 }
 
 class Tokenize {
-    public static String[] tokenize(String text) {
-        return Pattern.compile("((?:-{2,}|\\.{2,}|(?:\\.\\s){2,}\\.)|(?=[^(\"`{\\[:;&#*@)}\\]\\-,])\\S+?(?=\\s|$|(?:[?!)\";}\\]*:@'({\\[])|(?:-{2,}|\\.{2,}|(?:\\.\\s){2,}\\.)|,(?=$|\\s|(?:[?!)\";}\\]*:@'({\\[])|(?:-{2,}|\\.{2,}|(?:\\.\\s){2,}\\.)))|\\S)").matcher(text).results().map(MatchResult::group).toArray(String[]::new);
+    static String[] tokenize(String text) {
+        return Pattern.compile("\\w+|[^\\w\\s]+").matcher(text).results().map(MatchResult::group).toArray(String[]::new);
     }
 
-    public static String untokenize(String[] words) {
-        return String.join(" ", words).replace(" .", ".").replace(" ,", ",").replace(" :", ":").replace(" ;", ";").replace(" ?", "?").replace(" !", "!").replace(" %", "%").replace("`` ", "\"").replace(" ''", "\"").replace(". . .", "...").replace(" ( ", " (").replace(" ) ", ") ").replace(" '", "'").replace(" n't", "n't").replace("can not", "cannot").replace(" ` ", " '").strip();
+    static String untokenize(String[] words) {
+        return String.join(" ", words).replace(" .", ".").replace(" ,", ",").replace(" :", ":").replace(" ;", ";").replace(" ?", "?").replace(" !", "!").replace(" %", "%").replace("`` ", "\"").replace(" ''", "\"").replace(". . .", "...").replace(" ( ", " (").replace(" ) ", ") ").replace(" '", "'").replace(" n't", "n't").replace("can not", "cannot").replace(" ` ", " '").replace(" - ", "-").strip();
     }
 }
 
 class MarkovGen {
-    public static String[] bigramGen(String[] words, Hashtable<String, ArrayList<String>> bigrams, int wordCount) {
+    static String[] bigramGen(String[] words, Hashtable<String, ArrayList<String>> bigrams, int wordCount) {
         Random random = new Random();
         String[] firstWords = Arrays.stream(words).filter(word -> Character.isUpperCase(word.charAt(0))).toArray(String[]::new);
         String lastAppend = firstWords[random.nextInt(firstWords.length)];
         ArrayList<String> output = new ArrayList<>();
         for (int i = 0; i < wordCount; i++) {
             output.add(lastAppend);
-            if (bigrams.containsKey(lastAppend))
-                lastAppend = bigrams.get(lastAppend).get(random.nextInt(bigrams.get(lastAppend).size()));
-            else break;
+            if (bigrams.containsKey(lastAppend)) {
+                ArrayList<String> candidates = bigrams.get(lastAppend);
+                lastAppend = candidates.get(random.nextInt(candidates.size()));
+            } else break;
         }
         return output.toArray(String[]::new);
     }
 
-    public static String[] trigramGen(String[] words, Hashtable<String, ArrayList<String>> bigrams, Hashtable<String, Hashtable<String, ArrayList<String>>> trigrams, int wordCount) {
+    static String[] trigramGen(String[] words, Hashtable<String, ArrayList<String>> bigrams, Hashtable<String, Hashtable<String, ArrayList<String>>> trigrams) {
         Random random = new Random();
         String[] last2Appends = bigramGen(words, bigrams, 2);
         ArrayList<String> output = new ArrayList<>();
         output.add(last2Appends[0]);
-        for (int i = 0; i < wordCount; i++) {
+        for (int i = 0; i < 1000; i++) { //生成 1000 个单词（实际只会少不会多）
             output.add(last2Appends[1]);
             if (trigrams.containsKey(last2Appends[0])) {
                 if (trigrams.containsKey(last2Appends[1])) {
@@ -153,7 +157,7 @@ class MarkovGen {
 }
 
 class FileIO {
-    public static String readStrFromFile(String path) {
+    static String readStrFromFile(String path) {
         try {
             return Files.readString(Path.of(path), StandardCharsets.UTF_8);
         } catch (IOException e) {
